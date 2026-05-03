@@ -1,20 +1,12 @@
 #!/usr/bin/env bun
 /**
- * Stop hook — fires when the agent session ends.
- * Marks the FlowMate session as DONE.
+ * Stop hook — fires when the agent finishes a response.
+ *
+ * We do NOT auto-mark sessions as DONE here because the Stop hook fires after
+ * every single agent reply, not just when the user is truly finished with the
+ * task. DONE must be triggered explicitly via:
+ *   - "Mark as Done" / "End Session" buttons in the dashboard
+ *   - `flowmate done` CLI
  */
-import { getActiveSession, apiPost } from "./client";
-
-const session = await getActiveSession();
-if (!session) process.exit(0);
-
-const id: string = session.meta.id;
-
-// Only auto-close if actively building/reviewing — not if still planning or idle
-const activePhases = ["BUILDING", "COMMITTING", "REVIEWING", "FIX_COMMENTS"];
-if (activePhases.includes(session.state.phase)) {
-  await apiPost(`/sessions/${id}/end`, {});
-  process.stderr.write("\x1b[36m[FlowMate] Session marked complete.\x1b[0m\n");
-}
 
 process.exit(0);

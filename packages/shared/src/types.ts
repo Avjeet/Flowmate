@@ -63,7 +63,6 @@ export interface IntegrationConfig {
 
 export interface FlowMateConfig {
   port: number;
-  sessionsDir: string;
   integrations: IntegrationConfig;
 }
 

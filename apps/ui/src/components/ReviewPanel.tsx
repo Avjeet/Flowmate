@@ -1,7 +1,6 @@
 import { useState } from "react";
 import type { Session } from "@flowmate/shared";
-
-const BASE = "http://localhost:7842/api";
+import { BASE } from "../api";
 
 interface Comment {
   id: number;
@@ -21,7 +20,7 @@ export function ReviewPanel({ session, onDone }: Props) {
   const [comments, setComments] = useState<Comment[]>([]);
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [loading, setLoading] = useState(false);
-  const [queued, setQueued] = useState(false);
+  const [queued, setQueued] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [marking, setMarking] = useState(false);
 
@@ -31,7 +30,7 @@ export function ReviewPanel({ session, onDone }: Props) {
   async function fetchComments() {
     setLoading(true);
     setError(null);
-    setQueued(false);
+    setQueued(0);
     try {
       const r = await fetch(`${BASE}/gitlab/comments?sessionId=${session.meta.id}`);
       if (!r.ok) {
@@ -62,7 +61,7 @@ export function ReviewPanel({ session, onDone }: Props) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ comments: toFix }),
     });
-    setQueued(true);
+    setQueued(toFix.length);
     setSelected(new Set());
   }
 
@@ -187,7 +186,7 @@ export function ReviewPanel({ session, onDone }: Props) {
                       c.resolved ? "bg-green-800 border-green-700" : selected.has(c.id) ? "bg-blue-600 border-blue-600" : "border-gray-600"
                     }`}>
                       {(c.resolved || selected.has(c.id)) && (
-                        <span className="text-xs leading-none">{c.resolved ? "✓" : "✓"}</span>
+                        <span className="text-xs leading-none">✓</span>
                       )}
                     </div>
                     <div className="flex-1 min-w-0">
@@ -204,9 +203,9 @@ export function ReviewPanel({ session, onDone }: Props) {
             </>
           )}
 
-          {queued && (
+          {queued > 0 && (
             <div className="px-3 py-2 bg-blue-950/40 border border-blue-700 rounded text-xs text-blue-300">
-              ✓ {selected.size === 0 ? "Comments" : `${selected.size} comments`} queued. Run{" "}
+              ✓ {queued} comment{queued !== 1 ? "s" : ""} queued. Run{" "}
               <code className="bg-gray-800 px-1 rounded">/flowmate-fetch-comments</code> in your agent to apply fixes.
             </div>
           )}

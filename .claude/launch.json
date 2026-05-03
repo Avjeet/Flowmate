@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "flowmate-ui",
+      "runtimeExecutable": "/Users/avjeetsingh/.bun/bin/bun",
+      "runtimeArgs": ["run", "--cwd", "/Users/avjeetsingh/GPT/CoderBro/flowmate/apps/ui", "dev", "--port", "7843"],
+      "port": 7843
+    }
+  ]
+}

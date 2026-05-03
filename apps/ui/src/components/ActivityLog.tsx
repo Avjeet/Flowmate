@@ -4,7 +4,6 @@ const PHASE_BADGE: Record<string, string> = {
   IDLE: "bg-gray-700 text-gray-300",
   PLANNING: "bg-yellow-900 text-yellow-300",
   BUILDING: "bg-blue-900 text-blue-300",
-  TESTING: "bg-purple-900 text-purple-300",
   REVIEWING: "bg-orange-900 text-orange-300",
   FIX_COMMENTS: "bg-red-900 text-red-300",
   DONE: "bg-green-900 text-green-300",

@@ -8,7 +8,6 @@
  *     when ExitPlanMode fires (that's when we actually create a session)
  */
 
-import { spawnSync } from "child_process";
 import { writeFileSync, mkdirSync } from "node:fs";
 
 const FLOWMATE_DIR = new URL("../../..", import.meta.url).pathname.replace(/\/$/, "");

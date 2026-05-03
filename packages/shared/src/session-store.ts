@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "fs";
+import { existsSync, mkdirSync, readFileSync, readdirSync, unlinkSync, writeFileSync } from "fs";
 import { join } from "path";
 import type { Session, SessionMeta, SessionState, HistoryEntry, Phase } from "./types";
 
@@ -87,10 +87,9 @@ export function clearApprovalGate(id: string): Session | null {
 
 export function listSessions(): Session[] {
   ensureDirs();
-  const { readdirSync } = require("fs");
   const dirs = readdirSync(SESSIONS_DIR, { withFileTypes: true })
-    .filter((d: any) => d.isDirectory())
-    .map((d: any) => d.name);
+    .filter((d) => d.isDirectory())
+    .map((d) => d.name);
 
   return dirs
     .map((id: string) => readSession(id))
@@ -112,14 +111,14 @@ export function setActiveSession(id: string) {
 export function clearActiveSession() {
   const activePath = join(SESSIONS_DIR, "active");
   if (existsSync(activePath)) {
-    require("fs").unlinkSync(activePath);
+    unlinkSync(activePath);
   }
 }
 
 export function readConfig() {
   const configPath = join(FLOWMATE_DIR, "config.json");
   if (!existsSync(configPath)) {
-    return { port: 7842, sessionsDir: SESSIONS_DIR, integrations: {} };
+    return { port: 7842, integrations: {} };
   }
   return JSON.parse(readFileSync(configPath, "utf8"));
 }

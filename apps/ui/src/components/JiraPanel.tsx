@@ -1,7 +1,6 @@
 import { useState } from "react";
 import type { Session } from "@flowmate/shared";
-
-const BASE = "http://localhost:7842/api";
+import { BASE } from "../api";
 
 interface JiraTicket {
   key: string;

@@ -73,9 +73,6 @@ export function ApprovalPanel({ session, onApproved }: Props) {
           >
             Approve
           </button>
-          <button className="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded text-xs transition-colors">
-            Reject
-          </button>
         </div>
       </div>
     </div>

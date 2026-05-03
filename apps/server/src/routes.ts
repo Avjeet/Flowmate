@@ -14,8 +14,7 @@ import {
   ensureDirs,
 } from "@flowmate/shared";
 import { broadcast } from "./ws";
-import { GitLabClient } from "@flowmate/mcp-client";
-import { JiraClient } from "@flowmate/mcp-client";
+import { GitLabClient, JiraClient } from "@flowmate/mcp-client";
 import type { Phase, ApprovalGate } from "@flowmate/shared";
 
 // In-memory store for pending comments (selected by user in UI for fixing)
@@ -224,23 +223,14 @@ export async function handleRequest(req: Request): Promise<Response> {
   if (commitMatch && method === "POST") {
     const id = commitMatch[1];
     const body = await req.json();
-    const session = readSession(id);
-    if (!session) return notFound();
-
-    const now = new Date().toISOString();
-    if (body.mrUrl) session.meta.gitlabMRUrl = body.mrUrl;
-    if (body.prUrl) session.meta.githubPRUrl = body.prUrl;
-    session.meta.updatedAt = now;
 
     const updated = transitionPhase(id, "REVIEWING", "commit_pushed", {
       mrUrl: body.mrUrl,
       prUrl: body.prUrl,
     });
     if (!updated) return notFound();
-    // Merge MR/PR URLs into persisted meta (transitionPhase re-reads from disk)
-    updated.meta.gitlabMRUrl = body.mrUrl;
-    updated.meta.githubPRUrl = body.prUrl;
-    // Re-write with updated meta
+    if (body.mrUrl) updated.meta.gitlabMRUrl = body.mrUrl;
+    if (body.prUrl) updated.meta.githubPRUrl = body.prUrl;
     writeSession(updated);
 
     broadcast({ type: "session_update", sessionId: id, payload: updated });

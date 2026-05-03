@@ -55,24 +55,6 @@ export class GitLabClient {
     };
   }
 
-  async getMRComments(projectPath: string, mrIid: string | number): Promise<GitLabComment[]> {
-    const encoded = encodeURIComponent(projectPath);
-    const notes = await this.fetch(
-      `/projects/${encoded}/merge_requests/${mrIid}/notes?sort=asc&per_page=100`
-    );
-    return notes
-      .filter((n: any) => !n.system)
-      .map((n: any) => ({
-        id: n.id,
-        author: n.author?.username ?? "unknown",
-        body: n.body,
-        file: n.position?.new_path,
-        line: n.position?.new_line,
-        createdAt: n.created_at,
-        resolved: n.resolved ?? false,
-      }));
-  }
-
   async getMRDiffComments(projectPath: string, mrIid: string | number): Promise<GitLabComment[]> {
     const encoded = encodeURIComponent(projectPath);
     const discussions = await this.fetch(

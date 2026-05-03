@@ -72,19 +72,6 @@ export class JiraClient {
     });
   }
 
-  async addComment(key: string, body: string): Promise<void> {
-    await this.fetch(`/issue/${key}/comment`, {
-      method: "POST",
-      body: JSON.stringify({
-        body: {
-          type: "doc",
-          version: 1,
-          content: [{ type: "paragraph", content: [{ type: "text", text: body }] }],
-        },
-      }),
-    });
-  }
-
   async createStory(projectKey: string, summary: string, description?: string): Promise<JiraTicket> {
     const data = await this.fetch("/issue", {
       method: "POST",
@@ -111,24 +98,6 @@ export class JiraClient {
       }),
     });
     // Fetch the full issue to get status, etc.
-    return this.getTicket(data.key);
-  }
-
-  async createSubtask(parentKey: string, summary: string): Promise<JiraTicket> {
-    // Get project key from parent
-    const parent = await this.getTicket(parentKey);
-    const projectKey = parent.key.split("-")[0];
-    const data = await this.fetch("/issue", {
-      method: "POST",
-      body: JSON.stringify({
-        fields: {
-          project: { key: projectKey },
-          summary,
-          issuetype: { name: "Subtask" },
-          parent: { key: parentKey },
-        },
-      }),
-    });
     return this.getTicket(data.key);
   }
 }

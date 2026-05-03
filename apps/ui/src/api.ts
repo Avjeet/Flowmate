@@ -1,4 +1,4 @@
-const BASE = "http://localhost:7842/api";
+export const BASE = `http://localhost:${import.meta.env.VITE_SERVER_PORT ?? 7842}/api`;
 
 export async function getSessions() {
   const r = await fetch(`${BASE}/sessions`);

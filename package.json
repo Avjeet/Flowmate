@@ -1,0 +1,11 @@
+{
+  "name": "flowmate",
+  "version": "0.1.0",
+  "private": true,
+  "workspaces": ["apps/*", "packages/*"],
+  "scripts": {
+    "dev": "bun run --cwd apps/server dev & bun run --cwd apps/ui dev",
+    "start": "bun run --cwd apps/server start",
+    "build": "bun run --cwd apps/ui build"
+  }
+}

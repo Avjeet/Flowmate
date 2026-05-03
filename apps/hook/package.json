@@ -1,0 +1,7 @@
+{
+  "name": "@flowmate/hook",
+  "version": "0.1.0",
+  "dependencies": {
+    "@flowmate/shared": "workspace:*"
+  }
+}

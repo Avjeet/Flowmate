@@ -1,0 +1,37 @@
+{
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bun /Users/avjeetsingh/GPT/CoderBro/flowmate/apps/hook/src/on-session-start.ts"
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bun /Users/avjeetsingh/GPT/CoderBro/flowmate/apps/hook/src/on-pre-tool.ts"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bun /Users/avjeetsingh/GPT/CoderBro/flowmate/apps/hook/src/on-stop.ts"
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import type { Session } from "@flowmate/shared";
-import { getActiveSession, getSessions, getConfig } from "./api";
+import { getActiveSession, getSessions } from "./api";
 import { useWebSocket } from "./useWebSocket";
 import { SessionBar } from "./components/SessionBar";
 import { PhaseTimeline } from "./components/PhaseTimeline";
@@ -9,21 +9,23 @@ import { ActivityLog } from "./components/ActivityLog";
 import { SessionList } from "./components/SessionList";
 import { NewSessionModal } from "./components/NewSessionModal";
 import { GitLabPanel } from "./components/GitLabPanel";
+import { GitHubPanel } from "./components/GitHubPanel";
 import { JiraPanel } from "./components/JiraPanel";
 import { ReviewPanel } from "./components/ReviewPanel";
-import { IntegrationBanner } from "./components/IntegrationBanner";
 import { PendingSessionBanner } from "./components/PendingSessionBanner";
+import { ConnectorsModal } from "./components/ConnectorsModal";
+import { GitDetectBanner } from "./components/GitDetectBanner";
 
-type MainTab = "log" | "gitlab" | "jira" | "review";
+type MainTab = "log" | "gitlab" | "github" | "jira" | "review";
 
 export default function App() {
   const [activeSession, setActiveSession] = useState<Session | null>(null);
   const [allSessions, setAllSessions] = useState<Session[]>([]);
   const [viewingSession, setViewingSession] = useState<Session | null>(null); // session in focus (may differ from active)
   const [showNewModal, setShowNewModal] = useState(false);
+  const [showConnectors, setShowConnectors] = useState(false);
   const [connected, setConnected] = useState(false);
   const [tab, setTab] = useState<MainTab>("log");
-  const [showIntegrationBanner, setShowIntegrationBanner] = useState(false);
   const [pendingSession, setPendingSession] = useState<any>(null);
 
   const refresh = useCallback(async () => {
@@ -49,10 +51,6 @@ export default function App() {
   useEffect(() => {
     refresh();
     checkPending();
-    getConfig().then((config) => {
-      const hasAny = config?.integrations?.gitlab || config?.integrations?.jira;
-      if (!hasAny) setShowIntegrationBanner(true);
-    });
   }, [refresh, checkPending]);
 
   // Auto-switch to review tab when phase enters REVIEWING
@@ -92,6 +90,7 @@ export default function App() {
         session={activeSession}
         onUpdate={refresh}
         onNewSession={() => setShowNewModal(true)}
+        onOpenConnectors={() => setShowConnectors(true)}
       />
 
       {/* Connection indicator */}
@@ -108,17 +107,17 @@ export default function App() {
         <ApprovalPanel session={activeSession} onApproved={refresh} />
       )}
 
+      {/* Git repo auto-detection */}
+      {activeSession && !pendingSession && (
+        <GitDetectBanner session={activeSession} onLinked={refresh} />
+      )}
+
       {/* Pending session creation request */}
       {pendingSession && (
         <PendingSessionBanner
           pending={pendingSession}
           onDecision={() => { setPendingSession(null); refresh(); }}
         />
-      )}
-
-      {/* Integration setup banner */}
-      {showIntegrationBanner && !pendingSession && (
-        <IntegrationBanner onDismiss={() => setShowIntegrationBanner(false)} />
       )}
 
       {/* Main layout */}
@@ -146,7 +145,7 @@ export default function App() {
             <>
               {/* Tab bar */}
               <div className="flex border-b border-gray-800 bg-gray-900/50">
-                {(["log", ...(isReviewing ? ["review"] : []), "gitlab", "jira"] as MainTab[]).map((t) => (
+                {(["log", ...(isReviewing ? ["review"] : []), "gitlab", "github", "jira"] as MainTab[]).map((t) => (
                   <button
                     key={t}
                     onClick={() => setTab(t)}
@@ -173,9 +172,19 @@ export default function App() {
                         )}
                       </span>
                     )}
+                    {t === "github" && (
+                      <span className="flex items-center gap-1.5">
+                        GitHub
+                        {displayed.meta.githubPR && (
+                          <span className="px-1.5 py-0.5 bg-gray-700 text-gray-300 rounded text-xs">
+                            #{displayed.meta.githubPR}
+                          </span>
+                        )}
+                      </span>
+                    )}
                     {t === "jira" && (
                       <span className="flex items-center gap-1.5">
-                        JIRA
+                        Jira
                         {displayed.meta.jiraTicket && (
                           <span className="px-1.5 py-0.5 bg-blue-900/50 text-blue-400 rounded text-xs">
                             {displayed.meta.jiraTicket}
@@ -192,6 +201,7 @@ export default function App() {
                 {tab === "log" && <ActivityLog history={displayed.history} />}
                 {tab === "review" && <ReviewPanel session={displayed} onDone={refresh} />}
                 {tab === "gitlab" && <GitLabPanel session={displayed} />}
+                {tab === "github" && <GitHubPanel session={displayed} />}
                 {tab === "jira" && <JiraPanel session={displayed} />}
               </div>
             </>
@@ -206,6 +216,10 @@ export default function App() {
           onCreated={() => { setShowNewModal(false); refresh(); }}
           onClose={() => setShowNewModal(false)}
         />
+      )}
+
+      {showConnectors && (
+        <ConnectorsModal onClose={() => setShowConnectors(false)} />
       )}
     </div>
   );

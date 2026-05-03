@@ -14,7 +14,7 @@ import {
   ensureDirs,
 } from "@flowmate/shared";
 import { broadcast } from "./ws";
-import { GitLabClient, JiraClient } from "@flowmate/mcp-client";
+import { GitLabClient, JiraClient, GitHubClient } from "@flowmate/mcp-client";
 import type { Phase, ApprovalGate } from "@flowmate/shared";
 
 // In-memory store for pending comments (selected by user in UI for fixing)
@@ -32,6 +32,27 @@ function json(data: unknown, status = 200) {
 
 function notFound() {
   return json({ error: "not found" }, 404);
+}
+
+function handleDetectGit(cwd: string): Response {
+  const remoteProc = Bun.spawnSync(["git", "-C", cwd, "remote", "get-url", "origin"], { stderr: "pipe" });
+  if (remoteProc.exitCode !== 0) return json({ error: "No git remote found in that directory" }, 404);
+  const remote = remoteProc.stdout.toString().trim();
+
+  const branchProc = Bun.spawnSync(["git", "-C", cwd, "branch", "--show-current"], { stderr: "pipe" });
+  const branch = branchProc.exitCode === 0 ? branchProc.stdout.toString().trim() : "";
+
+  let provider: "github" | "gitlab" | "unknown" = "unknown";
+  let repo = "";
+  const httpsMatch = remote.match(/https?:\/\/(github\.com|gitlab\.com)\/([^/]+\/[^/.]+)/);
+  const sshMatch = remote.match(/git@(github\.com|gitlab\.com):([^/]+\/[^.]+)/);
+  const m = httpsMatch ?? sshMatch;
+  if (m) {
+    provider = m[1] === "github.com" ? "github" : "gitlab";
+    repo = m[2].replace(/\.git$/, "");
+  }
+
+  return json({ remote, repo, branch, provider });
 }
 
 export async function handleRequest(req: Request): Promise<Response> {
@@ -72,6 +93,7 @@ export async function handleRequest(req: Request): Promise<Response> {
       jiraTicket: body.jiraTicket,
       gitlabRepo: body.gitlabRepo,
       gitlabMR: body.gitlabMR,
+      cwd: body.cwd,
     });
     setActiveSession(session.meta.id);
     broadcast({ type: "session_update", sessionId: session.meta.id, payload: session });
@@ -101,6 +123,22 @@ export async function handleRequest(req: Request): Promise<Response> {
   }
 
   // GET /api/sessions/:id
+  // GET /api/detect-git?path=...  (standalone — no session required)
+  if (method === "GET" && path === "/api/detect-git") {
+    const dir = url.searchParams.get("path");
+    if (!dir) return json({ error: "path query param required" }, 400);
+    return handleDetectGit(dir);
+  }
+
+  // GET /api/sessions/:id/detect-git
+  const detectGitMatch = path.match(/^\/api\/sessions\/([^/]+)\/detect-git$/);
+  if (detectGitMatch && method === "GET") {
+    const id = detectGitMatch[1];
+    const session = readSession(id);
+    if (!session?.meta.cwd) return json({ error: "No working directory on session" }, 400);
+    return handleDetectGit(session.meta.cwd);
+  }
+
   const sessionMatch = path.match(/^\/api\/sessions\/([^/]+)$/);
   if (sessionMatch) {
     const id = sessionMatch[1];
@@ -108,6 +146,21 @@ export async function handleRequest(req: Request): Promise<Response> {
     if (method === "GET") {
       const session = readSession(id);
       return session ? json(session) : notFound();
+    }
+
+    // PATCH /api/sessions/:id  — update meta fields (repo, PR links, ticket, etc.)
+    if (method === "PATCH") {
+      const session = readSession(id);
+      if (!session) return notFound();
+      const body = await req.json();
+      const allowed = ["gitlabRepo","gitlabMR","gitlabMRUrl","githubRepo","githubPR","githubPRUrl","jiraTicket","jiraProjectKey","jiraTicketUrl"];
+      for (const key of allowed) {
+        if (key in body) (session.meta as any)[key] = body[key];
+      }
+      session.meta.updatedAt = new Date().toISOString();
+      writeSession(session);
+      broadcast({ type: "session_update", sessionId: id, payload: session });
+      return json(session);
     }
   }
 
@@ -351,6 +404,94 @@ export async function handleRequest(req: Request): Promise<Response> {
       return json({ ok: true });
     } catch (e: any) {
       return json({ error: e.message }, 502);
+    }
+  }
+
+  // ── GitHub integration ──────────────────────────────────────────────────────
+
+  // GET /api/github/pr?sessionId=...
+  if (method === "GET" && path === "/api/github/pr") {
+    const sessionId = url.searchParams.get("sessionId");
+    if (!sessionId) return json({ error: "sessionId required" }, 400);
+    const session = readSession(sessionId);
+    if (!session?.meta.githubRepo || !session?.meta.githubPR)
+      return json({ error: "No GitHub PR linked to this session" }, 400);
+    const config = readConfig();
+    if (!config.integrations?.github)
+      return json({ error: "GitHub not configured" }, 400);
+    try {
+      const client = new GitHubClient(config.integrations.github);
+      return json(await client.getPR(session.meta.githubRepo, session.meta.githubPR));
+    } catch (e: any) {
+      return json({ error: e.message }, 502);
+    }
+  }
+
+  // GET /api/github/comments?sessionId=...
+  if (method === "GET" && path === "/api/github/comments") {
+    const sessionId = url.searchParams.get("sessionId");
+    if (!sessionId) return json({ error: "sessionId required" }, 400);
+    const session = readSession(sessionId);
+    if (!session?.meta.githubRepo || !session?.meta.githubPR)
+      return json({ error: "No GitHub PR linked to this session" }, 400);
+    const config = readConfig();
+    if (!config.integrations?.github)
+      return json({ error: "GitHub not configured" }, 400);
+    try {
+      const client = new GitHubClient(config.integrations.github);
+      return json(await client.getPRComments(session.meta.githubRepo, session.meta.githubPR));
+    } catch (e: any) {
+      return json({ error: e.message }, 502);
+    }
+  }
+
+  // ── Test connections ────────────────────────────────────────────────────────
+
+  // POST /api/test/gitlab  { host, token }
+  if (method === "POST" && path === "/api/test/gitlab") {
+    const { host, token } = await req.json();
+    if (!host || !token) return json({ error: "host and token required" }, 400);
+    try {
+      const res = await globalThis.fetch(`https://${host}/api/v4/user`, {
+        headers: { "PRIVATE-TOKEN": token },
+        signal: AbortSignal.timeout(5000),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      return json({ ok: true, username: data.username });
+    } catch (e: any) {
+      return json({ ok: false, error: e.message }, 200);
+    }
+  }
+
+  // POST /api/test/jira  { host, email, token }
+  if (method === "POST" && path === "/api/test/jira") {
+    const { host, email, token } = await req.json();
+    if (!host || !email || !token) return json({ error: "host, email and token required" }, 400);
+    try {
+      const auth = "Basic " + Buffer.from(`${email}:${token}`).toString("base64");
+      const res = await globalThis.fetch(`https://${host}/rest/api/3/myself`, {
+        headers: { Authorization: auth, Accept: "application/json" },
+        signal: AbortSignal.timeout(5000),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      return json({ ok: true, displayName: data.displayName });
+    } catch (e: any) {
+      return json({ ok: false, error: e.message }, 200);
+    }
+  }
+
+  // POST /api/test/github  { token }
+  if (method === "POST" && path === "/api/test/github") {
+    const { token } = await req.json();
+    if (!token) return json({ error: "token required" }, 400);
+    try {
+      const client = new GitHubClient({ token });
+      const { login } = await client.testConnection();
+      return json({ ok: true, login });
+    } catch (e: any) {
+      return json({ ok: false, error: e.message }, 200);
     }
   }
 

@@ -22,7 +22,9 @@ export interface SessionMeta {
   gitlabRepo?: string;         // e.g. "org/repo"
   gitlabMR?: string;           // MR IID, populated at session creation
   gitlabMRUrl?: string;        // full URL, populated after commit+push
-  githubPRUrl?: string;        // for GitHub repos
+  githubRepo?: string;         // e.g. "owner/repo"
+  githubPR?: number;           // PR number, populated after commit+push
+  githubPRUrl?: string;        // full URL, populated after commit+push
   // Agent
   agentType: "claude" | "opencode" | "unknown";
   // Working directory at session start
@@ -58,6 +60,9 @@ export interface IntegrationConfig {
     host: string;
     token: string;
     email: string;
+  };
+  github?: {
+    token: string;
   };
 }
 

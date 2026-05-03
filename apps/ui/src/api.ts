@@ -13,6 +13,7 @@ export async function getActiveSession() {
 export async function createSession(data: {
   name: string;
   agentType?: string;
+  cwd?: string;
   jiraTicket?: string;
   gitlabRepo?: string;
   gitlabMR?: string;
